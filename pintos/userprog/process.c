@@ -327,7 +327,25 @@ load (const char *file_name, struct intr_frame *if_) {
 	struct file *file = NULL;
 	off_t file_ofs;
 	bool success = false;
-	int i;
+	int i = 0;
+	char *file_name_cpy;
+	char *argv[64]; /* TODO 임의 값 */
+	char *token, *save_ptr;
+	
+	file_name_cpy = palloc_get_page (PAL_ZERO);
+	if (file_name_cpy == NULL)
+		goto done;
+
+	// strtok 으로 인자값 자르기
+	// 원본 값 보호 위해 memcpy (\0 까지 저장하기 위해 +1 만큼 복사)
+	memcpy(file_name_cpy, file_name, strlen(file_name) + 1);
+
+	for (token = strtok_r (file_name_cpy, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+		// 배열로 받아서 저장하기 
+   		argv[i] = token;
+		i++;
+	}
+	
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -336,7 +354,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -411,6 +429,14 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (!setup_stack (if_))
 		goto done;
 
+
+	// 스택에 각 인자 추가 
+	
+	
+
+	// 레지스터에 넣기
+
+
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
@@ -419,9 +445,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 
-done:
+done: /* 성공 실패 모두 거침*/
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
+	palloc_free_page(file_name_cpy);
 	return success;
 }
 
