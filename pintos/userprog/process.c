@@ -445,7 +445,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		copy_add[j] = if_->rsp;
 		
 		// rsp 기준으로 데이터 넣기
-		memcpy ((void *) if_->rsp, val, strlen(&val) + 1);
+		memcpy ((void *) if_->rsp, val, strlen(val) + 1);
 	}
 
 	// 단어 정렬
@@ -467,6 +467,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		*(char **)if_->rsp = val;
 	}
 
+	// 레지스터에 넣기
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp;
+
 	// 가짜 리턴 주소 
 	if_->rsp -= 8;
 	*(char **)if_->rsp = 0;
@@ -475,10 +479,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	// 레지스터에 넣기
-	
-	
-	
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
