@@ -340,6 +340,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* file_name_cpy 함수 상단에서 초기화 */
+	/* 바로 아래 if문에서 done으로 점프했을 때 file_name_cpy가 선언되어 있어야함 */
+	// char *가 직관적이긴 하지만 void *로 해도 상관없다고함
+	void *file_name_cpy = NULL;
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -355,7 +360,6 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	//# Argument Passing 1 : 명령어 파싱
 	// 참고 : file_name 변수는 const. 복사 안해도 작동은 하지만 하는게 더 클린함
-	void *file_name_cpy = NULL;
 	if ((file_name_cpy = palloc_get_page(0)) == NULL) { goto done; }
 
 	memcpy(file_name_cpy, file_name, strlen(file_name) + 1);
@@ -369,7 +373,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	file = filesys_open (argv[0]); //# file_name에서 argv[0]로 수정
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", argv[0]);
 		goto done;
 	}
 
@@ -381,7 +385,7 @@ load (const char *file_name, struct intr_frame *if_) {
 			|| ehdr.e_version != 1
 			|| ehdr.e_phentsize != sizeof (struct Phdr)
 			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
+		printf ("load: %s: error loading executable\n", argv[0]);
 		goto done;
 	}
 
