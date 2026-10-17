@@ -40,39 +40,51 @@ syscall_init (void) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
 	printf ("system call!\n");
 	int syscall_num = f->R.rax;
 
 	switch (syscall_num) {
 		case SYS_HALT:
-			halt();
+			halt ();
 			break;
 		case SYS_EXIT:
+			exit (f->R.rdi);
 			break;
 		case SYS_FORK:
+			fork (f->R.rdi);
 			break;
 		case SYS_EXEC:
+			exec (f->R.rdi);
 			break;
 		case SYS_WAIT:
+			wait (f->R.rdi);
 			break;
 		case SYS_CREATE:
+			create (f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
+			remove (f->R.rdi);
 			break;
 		case SYS_OPEN:
+			open (f->R.rdi);
 			break;
 		case SYS_FILESIZE:
+			filesize (f->R.rdi);
 			break;
 		case SYS_READ:
+			read (f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
+			write (f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
+			seek (f->R.rdi, f->R.rsi);
 			break;
 		case SYS_TELL:
+			tell (f->R.rdi);
 			break;
 		case SYS_CLOSE:
+			close (f->R.rdi);
 			break;
 	}
 	thread_exit ();
