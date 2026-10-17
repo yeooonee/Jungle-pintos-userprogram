@@ -50,10 +50,21 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	////////////////////////////////////////////////////////////
+	char *token, *save_ptr;
+	char *cpy_file_name = palloc_get_page(PAL_ZERO);
+	char *argv[128];
+	int argc = 0;
+	mamcpy(cpy_file_name, file_name, strlen(file_name) + 1);
+	token = strtok_r (cpy_file_name, " ", &save_ptr);
+	argv[argc] = token;
+	///////////////////////////////////////////////////////////
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
+	palloc_free_page(cpy_file_name);
 	return tid;
 }
 
@@ -328,6 +339,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
+	
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -335,8 +347,21 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	/////////////* 파일 오픈 전 strtok *//////////////
+    char *token, *save_ptr;
+	char *cpy_file_name = palloc_get_page(PAL_ZERO);
+	char *argv[128];
+	int argc = 0;
+	memcpy(cpy_file_name, file_name, strlen(file_name) + 1);
+	/* load에서는 넘겨받은 문자열의 앞쪽([0])만 사용하기에 한번만 자름 */
+	token = strtok_r (cpy_file_name, " ", &save_ptr);
+	argv[argc] = token;
+	argc++;
+	/////////////////////////////////////////////////
+
+
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -416,11 +441,48 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	////////////////////* 파일 오픈 후 strtok *////////////////////
+	while ((token = strtok_r(NULL, " ", &save_ptr)) != NULL){
+		argv[argc] = token;
+		argc++;
+	}
+
+	for (int i = argc - 1; i >= 0; i--) {
+		size_t len = strlen(argv[i]) + 1;
+		if_->rsp -= len;
+		memcpy((void *)if_->rsp, argv[i], len);
+
+		argv[i] = (char *)if_->rsp;
+	}
+	//////////////////////////////////////////////////////////////
+
+	while (if_->rsp % 8 != 0) {
+		if_->rsp--;
+		*(uint8_t*)if_->rsp = 0;
+	}
+
+	if_->rsp -= 8;
+    *(char **)if_->rsp = 0;
+
+    
+    for (int i = argc - 1; i >= 0; i--) {
+        if_->rsp -= 8;
+        *(char **)if_->rsp = argv[i];
+    }
+
+
+    if_->R.rsi = if_->rsp;
+    if_->R.rdi = argc;
+
+    if_->rsp -= 8;
+    *(void **)if_->rsp = 0;
+
 
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
+	palloc_free_page(cpy_file_name);
 	file_close (file);
 	return success;
 }
