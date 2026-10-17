@@ -11,6 +11,8 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
+typedef int pid_t;
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -37,10 +39,119 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
+
+
+void
+halt (void) {
+	power_off ();
+}
+
+// 현재 프로세스를 새 프로그램으로 교체
+void
+exit (int status) {
+	
+	
+}
+
+pid_t
+fork (const char *thread_name){
+}
+
+int
+exec (const char *file) {
+}
+
+int
+wait (pid_t pid) {
+}
+
+bool
+create (const char *file, unsigned initial_size) {
+}
+
+bool
+remove (const char *file) {
+}
+
+int
+open (const char *file) {
+}
+
+int
+filesize (int fd) {
+}
+
+int
+read (int fd, void *buffer, unsigned size) {
+}
+
+int
+write (int fd, const void *buffer, unsigned size) {
+}
+
+void
+seek (int fd, unsigned position) {
+}
+
+unsigned
+tell (int fd) {
+}
+
+void
+close (int fd) {
+}
+
+
+
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
 	printf ("system call!\n");
-	thread_exit ();
+	int syscall_num = f->R.rax;
+
+	switch (syscall_num) {
+		case SYS_HALT:
+			halt ();
+			break;
+		case SYS_EXIT:
+			exit (f->R.rdi);
+			break;
+		case SYS_FORK:
+			f->R.rax = fork ((const char *)f->R.rdi);
+			break;
+		case SYS_EXEC:
+			f->R.rax = exec ((const char *)f->R.rdi);
+			break;
+		case SYS_WAIT:
+			f->R.rax = wait (f->R.rdi);
+			break;
+		case SYS_CREATE:
+			f->R.rax = create ((const char *)f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			f->R.rax = remove ((const char *)f->R.rdi);
+			break;
+		case SYS_OPEN:
+			f->R.rax = open ((const char *)f->R.rdi);
+			break;
+		case SYS_FILESIZE:
+			f->R.rax = filesize (f->R.rdi);
+			break;
+		case SYS_READ:
+			f->R.rax = read (f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+			break;
+		case SYS_WRITE:
+			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_SEEK:
+			seek (f->R.rdi, f->R.rsi);
+			break;
+		case SYS_TELL:
+			f->R.rax = tell (f->R.rdi);
+			break;
+		case SYS_CLOSE:
+			close (f->R.rdi);
+			break;
+	}
 }
+
