@@ -22,6 +22,12 @@
 #include "vm/vm.h"
 #endif
 
+
+
+#define THREAD_NAME_MAX  16 //# Thread 이름은 최대 14 캐릭터
+
+
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -50,8 +56,13 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char file_name_cpy[THREAD_NAME_MAX];
+	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
+	char *file_name_tkn, *save_ptr;
+	file_name_tkn = strtok_r (file_name_cpy, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -335,8 +346,28 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
+	//# Argument Passing 구현 
+	char *token, *save_ptr;
+	char *argv[128];
+	int argc = 0;
+	int len;
+	char *address[128];
+
+	//# Argument Passing 1 : 명령어 파싱
+	// 참고 : file_name 변수는 const. 복사 안해도 작동은 하지만 하는게 더 클린함
+	void *file_name_cpy = NULL;
+	if ((file_name_cpy = palloc_get_page(0)) == NULL) { goto done; }
+
+	memcpy(file_name_cpy, file_name, strlen(file_name) + 1);
+	for (token = strtok_r (file_name_cpy, " ", &save_ptr); token != NULL; 
+		token = strtok_r (NULL, " ", &save_ptr)) {
+		argv[argc] = token;
+		argc++;
+	}
+
+
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (argv[0]); //# file_name에서 argv[0]로 수정
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -408,20 +439,50 @@ load (const char *file_name, struct intr_frame *if_) {
 	}
 
 	/* Set up stack. */
-	if (!setup_stack (if_))
+	if (!setup_stack (if_))		//# 스택 초기 메모리 세팅
 		goto done;
 
 	/* Start address. */
-	if_->rip = ehdr.e_entry;
+	if_->rip = ehdr.e_entry;	//# 프로그램 진입점 세팅
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	//# Argument Passing 2 : 파싱한 문자열 데이터를 스택 적재
+	for (int i = argc - 1; i >= 0; i--) {
+		len = strlen(argv[i]) + 1;
+		if_->rsp -= len;
+		memcpy((void*)if_->rsp, (void*)argv[i], len);
+		address[i] = (char*)if_->rsp;
+	}
+
+	//# Argument Passing 3 : 패딩 (스택 포인터를 8의 배수로 하기 위해 마지막 3비트 제거)
+	if_->rsp = (if_->rsp) & ~0x7;
+	
+
+
+	//# Argument Passing 4 : null terminator 추가 (포인터 배열 끝임을 표시)
+	if_->rsp -= sizeof(char*);
+	*(char**)if_->rsp = NULL;
+
+
+	//# Argument Passing 5 : 문자열이 어디 있는지 알려주는 포인터를 스택 적재
+	for (int i = argc - 1; i >= 0; i--) {
+		if_->rsp -= sizeof(uint64_t);
+		*(char**)if_->rsp = address[i];
+	}
+
+	//# Argument Passing 6 : rdi, rsi 레지스터 저장
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp;
+
+	//# Argument Passing 7 : 반환주소 0 스택 적재
+	if_->rsp -= sizeof(void*);
+	*(void**)if_->rsp = NULL;
 
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
+	if (file_name_cpy != NULL) {palloc_free_page(file_name_cpy); }
 	return success;
 }
 
