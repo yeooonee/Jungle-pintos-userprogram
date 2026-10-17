@@ -332,7 +332,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *file_name_cpy;
 	char *argv[64]; /* TODO 임의 값 */
 	char *token, *save_ptr;
-	char *copy_add[64]; // 스택에 주소값 넣기 위한 배열
+	char *copy_addr[64]; // 스택에 주소값 넣기 위한 배열
 	
 	file_name_cpy = palloc_get_page (PAL_ZERO);
 	if (file_name_cpy == NULL)
@@ -432,8 +432,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 
 
-	// 스택에 각 인자 추가 
-	// for 문으로 스택 돌리기 (크기 -> 아래 )
+	// 1. 스택에 각 argv 명령어 추가 (순서 내림차순)
+	// for 문으로 각 argv 요소 스택에 추가
 	for (int j = argc - 1; j >= 0; j -- ){
 		// 데이터 가져오기 
 		char *val = argv[j];
@@ -442,23 +442,23 @@ load (const char *file_name, struct intr_frame *if_) {
 		if_->rsp -= strlen(val) + 1;
 
 		// 이동한 위치 값 기록하기
-		copy_add[j] = if_->rsp;
+		copy_addr[j] = if_->rsp;
 		
 		// rsp 기준으로 데이터 넣기
 		memcpy ((void *) if_->rsp, val, strlen(val) + 1);
 	}
 
-	// 단어 정렬
+	// 2. 정렬 추가
 	if_->rsp = if_->rsp & ~0x7;
 
-	// argv[+1 값] = null 문자
+	// 3. 구분자 추가 
 	if_->rsp -= 8;
 	*(char **)if_->rsp = NULL;
 
-	// argv 주소 넣기 
+	// 4. argv 주소 넣기 
 	for (int j = argc - 1; j >= 0; j -- ){
 		// 데이터 가져오기 
-		char *val = copy_add[j];
+		char *val = copy_addr[j];
 		
 		// 데이터 길이만큼 rsp 이동하기 
 		if_->rsp -= sizeof(val);
@@ -471,16 +471,13 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->R.rdi = argc;
 	if_->R.rsi = if_->rsp;
 
-	// 가짜 리턴 주소 
+	// 가짜 리턴 주소 추가
 	if_->rsp -= 8;
 	*(char **)if_->rsp = 0;
 
 	
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
 	success = true;
 
