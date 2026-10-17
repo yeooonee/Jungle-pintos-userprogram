@@ -22,6 +22,12 @@
 #include "vm/vm.h"
 #endif
 
+
+
+#define THREAD_NAME_MAX  16 //# Thread 이름은 최대 14 캐릭터
+
+
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -49,6 +55,11 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
+
+	char file_name_cpy[THREAD_NAME_MAX];
+	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
+	char *file_name_tkn, *save_ptr;
+	file_name_tkn = strtok_r (file_name_cpy, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
