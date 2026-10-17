@@ -11,6 +11,8 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
+typedef int pid_t;
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -37,57 +39,7 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
-/* The main system call interface */
-void
-syscall_handler (struct intr_frame *f UNUSED) {
-	printf ("system call!\n");
-	int syscall_num = f->R.rax;
 
-	switch (syscall_num) {
-		case SYS_HALT:
-			halt ();
-			break;
-		case SYS_EXIT:
-			exit (f->R.rdi);
-			break;
-		case SYS_FORK:
-			f->R.rax = fork ((const char *)f->R.rdi);
-			break;
-		case SYS_EXEC:
-			f->R.rax = exec ((const char *)f->R.rdi);
-			break;
-		case SYS_WAIT:
-			f->R.rax = wait (f->R.rdi);
-			break;
-		case SYS_CREATE:
-			f->R.rax = create ((const char *)f->R.rdi, f->R.rsi);
-			break;
-		case SYS_REMOVE:
-			f->R.rax = remove ((const char *)f->R.rdi);
-			break;
-		case SYS_OPEN:
-			f->R.rax = open ((const char *)f->R.rdi);
-			break;
-		case SYS_FILESIZE:
-			f->R.rax = filesize (f->R.rdi);
-			break;
-		case SYS_READ:
-			f->R.rax = read (f->R.rdi, (void *)f->R.rsi, f->R.rdx);
-			break;
-		case SYS_WRITE:
-			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_SEEK:
-			seek (f->R.rdi, f->R.rsi);
-			break;
-		case SYS_TELL:
-			f->R.rax = tell (f->R.rdi);
-			break;
-		case SYS_CLOSE:
-			close (f->R.rdi);
-			break;
-	}
-}
 
 void
 halt (void) {
@@ -148,3 +100,58 @@ tell (int fd) {
 void
 close (int fd) {
 }
+
+
+
+/* The main system call interface */
+void
+syscall_handler (struct intr_frame *f UNUSED) {
+	printf ("system call!\n");
+	int syscall_num = f->R.rax;
+
+	switch (syscall_num) {
+		case SYS_HALT:
+			halt ();
+			break;
+		case SYS_EXIT:
+			exit (f->R.rdi);
+			break;
+		case SYS_FORK:
+			f->R.rax = fork ((const char *)f->R.rdi);
+			break;
+		case SYS_EXEC:
+			f->R.rax = exec ((const char *)f->R.rdi);
+			break;
+		case SYS_WAIT:
+			f->R.rax = wait (f->R.rdi);
+			break;
+		case SYS_CREATE:
+			f->R.rax = create ((const char *)f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			f->R.rax = remove ((const char *)f->R.rdi);
+			break;
+		case SYS_OPEN:
+			f->R.rax = open ((const char *)f->R.rdi);
+			break;
+		case SYS_FILESIZE:
+			f->R.rax = filesize (f->R.rdi);
+			break;
+		case SYS_READ:
+			f->R.rax = read (f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+			break;
+		case SYS_WRITE:
+			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_SEEK:
+			seek (f->R.rdi, f->R.rsi);
+			break;
+		case SYS_TELL:
+			f->R.rax = tell (f->R.rdi);
+			break;
+		case SYS_CLOSE:
+			close (f->R.rdi);
+			break;
+	}
+}
+
