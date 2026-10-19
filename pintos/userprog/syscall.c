@@ -1,6 +1,9 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "kernel/stdio.h"
+#include "filesys/file.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
@@ -55,7 +58,6 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name){
-
 }
 
 int
@@ -98,7 +100,20 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	if (fd == 1) {
+		putbuf (buffer, size);
+		return size;
+	}
+
+
+
+
+	// else {
+	// 	struct file *f = 
+	// 	return file_write();
+	// }
 	
+
 }
 
 void

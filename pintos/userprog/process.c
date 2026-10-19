@@ -17,6 +17,7 @@
 #include "threads/thread.h"
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 #include "intrinsic.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -191,7 +192,7 @@ process_exec (void *f_name) {
 	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	// palloc_free_page (file_name);
 	if (!success)
 		return -1;
 
@@ -217,10 +218,11 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 
 
-	while (1) {
-		printf("1");
+	while (true) {
+		barrier();
 	}
-	
+
+
 	return -1;
 }
 
