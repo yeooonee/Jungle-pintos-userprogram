@@ -124,7 +124,7 @@ sema_up (struct semaphore *sema) {
 	if (intr_context ()) {
 		intr_yield_on_return ();	//# interrupt handler context : yield when interrupt finishes returning
 	} else {
-		thread_yield();				//# normal thread context : unblocked thread can run immediately if priority is higher
+		thread_yield_if_preempted();				//# normal thread context : unblocked thread can run immediately if priority is higher
 	}
 }
 
