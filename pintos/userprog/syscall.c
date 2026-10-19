@@ -46,14 +46,16 @@ halt (void) {
 	power_off ();
 }
 
-// 현재 프로세스를 새 프로그램으로 교체
 void
 exit (int status) {
-	
-	
+	struct thread *curr = thread_current ();
+	curr->exit_status = status;
+	thread_exit ();
 }
 
-pid_tfork (const char *thread_name){
+pid_t
+fork (const char *thread_name){
+
 }
 
 int
@@ -96,6 +98,7 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	
 }
 
 void

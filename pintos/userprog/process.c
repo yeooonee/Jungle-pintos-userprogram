@@ -215,8 +215,17 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+
+	while (1) {
+		printf("1");
+	}
+	
 	return -1;
 }
+
+
+
 
 /* Exit the process. This function is called by thread_exit (). */
 void
@@ -227,8 +236,18 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// Process Termination Message
+	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	
+
 	process_cleanup ();
 }
+	
+
+
+
+
+
 
 /* Free the current process's resources. */
 static void
