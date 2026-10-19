@@ -53,12 +53,21 @@ exit (int status) {
 	
 }
 
-pid_t
-fork (const char *thread_name){
+pid_tfork (const char *thread_name){
 }
 
 int
 exec (const char *file) {
+	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
+	char *file_name = palloc_get_page(0);
+	memcpy(file_name, file, strlen(file) + 1);
+
+	int rtn = process_exec(file_name);
+	palloc_free_page(file_name);
+	
+	if (rtn == -1) {
+		return -1;
+	}
 }
 
 int
