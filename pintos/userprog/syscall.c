@@ -1,6 +1,9 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "kernel/stdio.h"
+#include "filesys/file.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
@@ -46,11 +49,11 @@ halt (void) {
 	power_off ();
 }
 
-// 현재 프로세스를 새 프로그램으로 교체
 void
 exit (int status) {
-	
-	
+	struct thread *curr = thread_current ();
+	curr->exit_status = status;
+	thread_exit ();
 }
 
 pid_t
@@ -59,6 +62,16 @@ fork (const char *thread_name){
 
 int
 exec (const char *file) {
+	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
+	char *file_name = palloc_get_page(0);
+	memcpy(file_name, file, strlen(file) + 1);
+
+	int rtn = process_exec(file_name);
+	palloc_free_page(file_name);
+	
+	if (rtn == -1) {
+		return -1;
+	}
 }
 
 int
@@ -87,6 +100,20 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	if (fd == 1) {
+		putbuf (buffer, size);
+		return size;
+	}
+
+
+
+
+	// else {
+	// 	struct file *f = 
+	// 	return file_write();
+	// }
+	
+
 }
 
 void

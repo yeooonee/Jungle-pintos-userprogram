@@ -313,6 +313,16 @@ thread_yield (void) {
 }
 
 
+void
+thread_yield_if_preempted(void) {
+    if (!list_empty(&ready_list)) {
+        struct thread *next = list_entry(list_front(&ready_list), struct thread, elem);
+        if (next->priority > thread_current()->priority)
+            thread_yield();
+    }
+}
+
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
