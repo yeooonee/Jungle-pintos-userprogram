@@ -1,0 +1,89 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Pintos",
+            "type": "process",
+            "command": "/usr/bin/python3",
+            "args": [
+                "${workspaceFolder}/.vscode/pintos-debug.py",
+                "--build",
+                "${input:testName}"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "showReuseMessage": false,
+                "echo": false
+            }
+        },
+        {
+            "label": "Show Pintos test result",
+            "type": "process",
+            "command": "/usr/bin/python3",
+            "args": [
+                "${workspaceFolder}/.vscode/pintos-debug.py",
+                "--check"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "clear": false,
+                "showReuseMessage": false,
+                "echo": false
+            }
+        },
+        {
+            "label": "Run Pintos (all threads tests)",
+            "type": "process",
+            "command": "make",
+            "args": ["check"],
+            "options": {
+                "cwd": "${workspaceFolder}/pintos/threads",
+                "env": {
+                    "PATH": "${workspaceFolder}/pintos/utils:${env:PATH}"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testName",
+            "type": "pickString",
+            "description": "실행할 Pintos 테스트 케이스를 선택하세요",
+            "options": [
+                "args-none",
+                "args-single",
+                "args-multiple",
+                "halt",
+                "exit",
+                "write-normal",
+                "write-bad-ptr",
+                "read-normal",
+                "create-normal",
+                "open-normal",
+                "close-normal",
+                "exec-once",
+                "exec-arg",
+                "wait-simple",
+                "fork-once"
+            ],
+            "default": "args-none"
+        }
+    ]
+}

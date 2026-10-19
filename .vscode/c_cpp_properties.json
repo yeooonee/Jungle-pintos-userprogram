@@ -1,12 +1,25 @@
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "Pintos",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}",
+                "${workspaceFolder}/pintos",
+                "${workspaceFolder}/pintos/include/lib",
+                "${workspaceFolder}/pintos/include",
+                "${workspaceFolder}/pintos/include/lib/kernel",
+                "${workspaceFolder}/pintos/include/lib/user",
+                "${workspaceFolder}/pintos/lib/kernel",
+                "${workspaceFolder}/pintos/tests/threads"
             ],
-            "defines": ["USERPROG"],
+            "defines": [
+                "USERPROG",
+                "FILESYS"
+            ],
             "compilerPath": "/usr/bin/gcc",
+            "compilerArgs": [
+                "-nostdinc"
+            ],
             "cStandard": "gnu17",
             "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-x64"

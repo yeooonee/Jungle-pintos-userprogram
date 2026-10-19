@@ -1,0 +1,64 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "debug_pintos",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/pintos/userprog/build/kernel.o",
+            "cwd": "${workspaceFolder}/pintos/userprog/build",
+            "MIMode": "gdb",
+            "targetArchitecture": "x64",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerServerAddress": "127.0.0.1:1234",
+            "debugServerPath": "/usr/bin/python3",
+            "debugServerArgs": "-u \"${workspaceFolder}/.vscode/pintos-debug.py\" ${input:testName}",
+            "serverStarted": "Pintos GDB server ready",
+            "serverLaunchTimeout": 20000,
+            "filterStdout": true,
+            "filterStderr": false,
+            "hardwareBreakpoints": {
+                "require": true
+            },
+            "customLaunchSetupCommands": [
+                {
+                    "text": "-file-exec-and-symbols \"${workspaceFolder}/pintos/userprog/build/kernel.o\""
+                },
+                {
+                    "text": "-target-select remote 127.0.0.1:1234"
+                }
+            ],
+            "launchCompleteCommand": "exec-continue",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "preLaunchTask": "Build Pintos",
+            "postDebugTask": "Show Pintos test result"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testName",
+            "type": "pickString",
+            "description": "실행할 Pintos 테스트 케이스를 선택하세요",
+            "options": [
+                "args-none",
+                "args-single",
+                "args-multiple",
+                "halt",
+                "exit",
+                "write-normal",
+                "write-bad-ptr",
+                "read-normal",
+                "create-normal",
+                "open-normal",
+                "close-normal",
+                "exec-once",
+                "exec-arg",
+                "wait-simple",
+                "fork-once"
+            ],
+            "default": "args-none"
+        }
+    ]
+}

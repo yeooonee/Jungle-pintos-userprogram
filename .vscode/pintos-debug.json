@@ -1,0 +1,4 @@
+{
+    "test": "fork-once",
+    "icount": "shift=8,align=off,sleep=off"
+}
