@@ -511,10 +511,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	//# Argument Passing 구현 
 	char *token, *save_ptr;
-	char *argv[128];
+	char *argv[64];
 	int argc = 0;
 	int len;
-	char *address[128];
+	char *address[64];
 
 	//# Argument Passing 1 : 명령어 파싱
 	// 참고 : file_name 변수는 const. 복사 안해도 작동은 하지만 하는게 더 클린함

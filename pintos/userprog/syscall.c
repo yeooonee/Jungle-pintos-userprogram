@@ -72,6 +72,10 @@ fork (const char *thread_name, struct intr_frame *f){
 
 int
 exec (const char *file) {
+	if (file == NULL || !is_user_vaddr(file) || !pml4_get_page(thread_current()->pml4, file)){
+		exit(-1);
+	}
+
 	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
 	char *file_name = palloc_get_page(0);
 	memcpy(file_name, file, strlen(file) + 1);
