@@ -23,6 +23,7 @@
 #include "vm/vm.h"
 #endif
 #include "threads/malloc.h"
+#include "threads/mmu.h"
 
 
 
@@ -139,35 +140,44 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	struct thread *curr = thread_current();
 	
-	struct job_args ja;
-
 	// malloc 불러오기
 	struct child_status *cs = malloc(sizeof *cs);	
 	if (cs == NULL) return TID_ERROR;
 	sema_init(&cs->wait_sema, 0);
 	sema_init(&cs->fork_sema, 0);
 	cs->exit_status = -1;
+	cs->fork_success = false;	
+
+	struct job_args *ja = malloc(sizeof *ja);
+	if (ja == NULL) {
+		free(cs);
+		return TID_ERROR;
+	}
 
 	// thread_create aux 전달 값 묶음으로 추가 
 	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
-	ja.itrf = if_;
-	ja.th = curr;
-	ja.cs = cs;
+	ja->itrf = if_;
+	ja->th = curr;
+	ja->cs = cs;
 	
 	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
 	tid_t tid = thread_create (name,
-			PRI_DEFAULT, __do_fork, &ja);
-
-			
+			PRI_DEFAULT, __do_fork, ja);
 			
 	// thread_create 성공 여부 확인
 	if (tid == TID_ERROR){
+		free(ja);
 		free(cs);
 		return TID_ERROR;
 	} 
 
 	sema_down(&cs->fork_sema);
+	
+	if (!cs->fork_success) {
+		free(cs);
+		return TID_ERROR;
+	}
 	
 	// child_status 생성
 	cs->child_pid = tid;
