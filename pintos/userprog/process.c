@@ -22,6 +22,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#include "threads/malloc.h"
 
 
 
@@ -83,13 +84,56 @@ initd (void *f_name) {
 	NOT_REACHED ();
 }
 
+
+
+struct job_args {
+	struct thread *th;
+	struct intr_frame *itrf;
+};
+
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
+	struct thread *curr = thread_current();
+	
+	struct job_args ja;
+
+	// malloc 불러오기
+	struct child_status *cs = malloc(sizeof *cs);	
+	if (cs == NULL) return TID_ERROR;
+	sema_init(&cs->wait_sema, 0);
+	sema_init(&cs->fork_sema, 0);
+	cs->exit_status = -1;
+
+	// thread_create aux 전달 값 묶음으로 추가 
+	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
+	ja.itrf = if_;
+	ja.th = curr;
+	
+	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name,
+			PRI_DEFAULT, __do_fork, &ja);
+
+			
+			
+	// thread_create 성공 여부 확인
+	if (tid == TID_ERROR){
+		free(cs);
+		return TID_ERROR;
+	} 
+
+	sema_down(&curr->child_status->fork_sema);
+	
+	// child_status 생성
+	cs->child_pid = tid;
+	
+	// 반환값 부모의 thread child_list 에 저장
+	list_push_back(&curr->child_list, &cs->child_elem);
+
+	return tid;
+
 }
 
 #ifndef VM
@@ -131,12 +175,15 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	
+	struct job_args *ja = (struct job_args *) aux;
+	struct thread *parent = ja->th;
+	
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
 	bool succ = true;
-
+	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -163,6 +210,8 @@ __do_fork (void *aux) {
 
 	process_init ();
 
+	sema_up(&parent->child_status->fork_sema);
+	
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);

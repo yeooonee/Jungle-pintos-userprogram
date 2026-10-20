@@ -10,6 +10,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -58,14 +60,12 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name){
-	// 현재 프로세스 복제한 새 프로세스 생성
-		// 복제 대상 (가상 메모리 공간, 파일 디스크립터, 레지스터)
-	// 반환값 (부모는 자식이 복제를 성공적으로 마쳤는지 알기 전까지 반환 금지)
-		// 성공하면 자식 pid, 
-		// 실패하면 TID_ERROR
-		// 자식 0
-	// 반환값 부모의 thread child_list 에 저장
-	
+	// 1) thread_name 주소 검사
+	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || pml4_get_page(thread_name, NULL) ){
+		exit(-1);
+	}
+
+	// 2) process_fork 호출 및 반환
 
 }
 

@@ -433,6 +433,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->original_priority = priority;
 	list_init (&t->donation_list);
+	list_init (&t->child_list);
 	t->waiting_lock = NULL;
 	t->wakeup_time = 0;
 	t->magic = THREAD_MAGIC;
