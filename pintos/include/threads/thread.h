@@ -131,6 +131,7 @@ struct child_status {
 	struct list_elem child_elem;
 	struct semaphore wait_sema;
 	struct semaphore fork_sema;
+	bool fork_success;
 };
 
 

@@ -141,14 +141,19 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	struct thread *curr = thread_current();
 	
-	struct job_args ja;
-
 	// malloc 불러오기
 	struct child_status *cs = malloc(sizeof *cs);	
 	if (cs == NULL) return TID_ERROR;
 	sema_init(&cs->wait_sema, 0);
 	sema_init(&cs->fork_sema, 0);
 	cs->exit_status = -1;
+	cs->fork_success = false;	
+
+	struct job_args *ja = malloc(sizeof *ja);
+	if (ja == NULL) {
+		free(cs);
+		return TID_ERROR;
+	}
 
 	// thread_create aux 전달 값 묶음으로 추가 
 	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
@@ -160,12 +165,11 @@ process_fork (const char *name, struct intr_frame *if_) {
 	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
 	tid_t tid = thread_create (name,
-			PRI_DEFAULT, __do_fork, &ja);
-
-			
+			PRI_DEFAULT, __do_fork, ja);
 			
 	// thread_create 성공 여부 확인
 	if (tid == TID_ERROR){
+		free(ja);
 		free(cs);
 		return TID_ERROR;
 	} 
@@ -199,21 +203,35 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va)) {
+		return true;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL) {		//# parent_page가 NULL인 경우 처리
+		return false;
+	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	if ((newpage = palloc_get_page(PAL_USER)) == NULL) {
+		return false;
+	}
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte); //# 자식 페이지의 쓰기 권한 결정
+
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -228,6 +246,7 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	
 	struct job_args *ja = (struct job_args *) aux;
+	struct child_status *cs = ja->cs;
 	struct thread *parent = ja->th;
 	
 	struct thread *current = thread_current ();
@@ -276,6 +295,7 @@ __do_fork (void *aux) {
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
+	
 error:
 	current->self_status = NULL;
 	sema_up(&cs->fork_sema);
@@ -367,9 +387,6 @@ process_wait (tid_t child_tid) {
 	return exit_status;
 }
 
-
-
-
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
@@ -395,12 +412,6 @@ process_exit (void) {
 	}
 }
 	
-
-
-
-
-
-
 /* Free the current process's resources. */
 static void
 process_cleanup (void) {
