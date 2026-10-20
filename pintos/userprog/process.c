@@ -274,12 +274,14 @@ process_exit (void) {
 		free(ci);
 	}
 
-	//# 3. 부모에게 자식 프로세스 끝났다고 sema_up
-	sema_up(&curr->child_info->wait_sema);
+	//# 3. Process Termination Message
+	//# 4. 부모에게 자식 프로세스 끝났다고 sema_up
+    if (curr->child_info != NULL) {
+        printf("%s: exit(%d)\n", curr->name, curr->child_info->exit_status);
+        sema_up(&curr->child_info->wait_sema);
+    }
 	
-	//# 4. Process Termination Message
-	printf("%s: exit(%d)\n", curr->name, curr->child_info->exit_status);
-	
+	process_cleanup();
 }
 	
 
