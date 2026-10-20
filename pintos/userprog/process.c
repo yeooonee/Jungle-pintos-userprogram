@@ -259,7 +259,12 @@ process_exit (void) {
 
 	struct thread *curr = thread_current ();
 
-	//# 1. 열린 fd 전부 닫기
+	//# 1. 열린 fd 전부 닫기 (아직 구현 중)
+
+	if (curr->pml4 == NULL) {
+        process_cleanup();
+        return;
+    }
 
 	//# 2. 자식들의 child_info 구조체 free
 	struct list_elem *e = list_begin(&curr->children);
@@ -275,7 +280,6 @@ process_exit (void) {
 	//# 4. Process Termination Message
 	printf("%s: exit(%d)\n", curr->name, curr->child_info->exit_status);
 	
-	process_cleanup ();
 }
 	
 
