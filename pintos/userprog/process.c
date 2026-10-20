@@ -89,6 +89,7 @@ initd (void *f_name) {
 struct job_args {
 	struct thread *th;
 	struct intr_frame *itrf;
+	struct child_status *cs;
 };
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
@@ -110,6 +111,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
 	ja.itrf = if_;
 	ja.th = curr;
+	ja.cs = cs;
 	
 	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
@@ -124,7 +126,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 		return TID_ERROR;
 	} 
 
-	sema_down(&curr->child_status->fork_sema);
+	sema_down(&cs->fork_sema);
 	
 	// child_status 생성
 	cs->child_pid = tid;
@@ -181,8 +183,11 @@ __do_fork (void *aux) {
 	
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = ja->itrf;
 	bool succ = true;
+
+	// 자식 thread 에 본인 cs 기록 (종료할 때 필요)
+	current->self_status = ja->cs;
 	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -210,7 +215,8 @@ __do_fork (void *aux) {
 
 	process_init ();
 
-	sema_up(&parent->child_status->fork_sema);
+	// sema_up(&parent->child_status->fork_sema);
+	sema_up(&ja->cs->fork_sema);
 	
 	/* Finally, switch to the newly created process. */
 	if (succ)

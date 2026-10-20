@@ -107,7 +107,7 @@ struct thread {
 	// USERPROG NEW FIELDS
 	int exit_status;	// 종료 코드
 	struct list child_list;
-	struct child_status *child_status; 
+	struct child_status *self_status; 
 
 
 #ifdef USERPROG
