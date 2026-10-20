@@ -23,7 +23,6 @@
 #include "vm/vm.h"
 #endif
 #include "threads/malloc.h"
-#include "threads/mmu.h"
 
 
 
@@ -299,16 +298,6 @@ error:
 	thread_exit ();
 }
 
-
-
-
-
-
-
-
-
-
-
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int
@@ -394,9 +383,6 @@ process_wait (tid_t child_tid) {
 	return exit_status;
 }
 
-
-
-
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
@@ -422,12 +408,6 @@ process_exit (void) {
 	}
 }
 	
-
-
-
-
-
-
 /* Free the current process's resources. */
 static void
 process_cleanup (void) {
