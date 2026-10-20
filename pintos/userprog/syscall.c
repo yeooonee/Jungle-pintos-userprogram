@@ -86,7 +86,7 @@ exec (const char *file) {
 	palloc_free_page(file_name);
 	
 	if (rtn == -1) {
-		return -1;
+		exit(-1);
 	}
 }
 
