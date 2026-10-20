@@ -201,21 +201,35 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va)) {
+		return true;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL) {		//# parent_page가 NULL인 경우 처리
+		return false;
+	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	if ((newpage = palloc_get_page(PAL_USER)) == NULL) {
+		return false;
+	}
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte); //# 자식 페이지의 쓰기 권한 결정
+
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -230,6 +244,7 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	
 	struct job_args *ja = (struct job_args *) aux;
+	struct child_status *cs = ja->cs;
 	struct thread *parent = ja->th;
 	
 	struct thread *current = thread_current ();
@@ -265,9 +280,9 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 
 	process_init ();
-
-	// sema_up(&parent->child_status->fork_sema);
-	sema_up(&ja->cs->fork_sema);
+	cs->fork_success = true;
+	free(ja);
+	sema_up(&cs->fork_sema);
 
 	// if_ 의 rax 0으로
 	if_.R.rax = 0;
@@ -275,9 +290,23 @@ __do_fork (void *aux) {
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
+	
 error:
+	cs->fork_success = false;
+	free(ja);
+	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
+
+
+
+
+
+
+
+
+
+
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
