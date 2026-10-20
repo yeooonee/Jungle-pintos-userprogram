@@ -8,6 +8,9 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#include "threads/synch.h"
+
+typedef int pid_t;
 
 
 /* States in a thread's life cycle. */
@@ -103,6 +106,8 @@ struct thread {
 
 	// USERPROG NEW FIELDS
 	int exit_status;	// 종료 코드
+	struct list child_list;
+	struct child_status *self_status; 
 
 
 #ifdef USERPROG
@@ -118,6 +123,16 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
+
+// 자식 thread 
+struct child_status {
+	int exit_status;
+	pid_t child_pid;
+	struct list_elem child_elem;
+	struct semaphore wait_sema;
+	struct semaphore fork_sema;
+};
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

@@ -22,6 +22,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#include "threads/malloc.h"
 
 
 
@@ -40,6 +41,11 @@ process_init (void) {
 	struct thread *current = thread_current ();
 }
 
+struct task_args {
+	char *fn_copy;
+	struct child_status *cs;
+};
+
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
  * before process_create_initd() returns. Returns the initd's
@@ -57,39 +63,120 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	struct child_status *cs = malloc(sizeof *cs);	
+	struct task_args *args = malloc(sizeof *args);
+	
+	if (cs == NULL) {
+		palloc_free_page (fn_copy);
+		free(args);
+		return TID_ERROR;
+	}else if (args == NULL){
+		free(cs);
+		palloc_free_page (fn_copy);
+		return TID_ERROR;
+	}
+	
+	sema_init(&cs->wait_sema, 0);
+	sema_init(&cs->fork_sema, 0);
+	cs->exit_status = -1;
+
+	args->cs = cs;
+	args->fn_copy = fn_copy;
+
 	char file_name_cpy[THREAD_NAME_MAX];
 	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
 	char *file_name_tkn, *save_ptr;
 	file_name_tkn = strtok_r (file_name_cpy, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
+	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, args);
+	if (tid == TID_ERROR){
 		palloc_free_page (fn_copy);
+		free(cs);
+		free(args);
+		return TID_ERROR;
+	}
+	cs->child_pid = tid;
+	struct thread *curr = thread_current();
+	list_push_back (&curr->child_list, &cs->child_elem);
 	return tid;
 }
 
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
+	struct task_args *args = (struct task_args *) f_name;
+	char *fn_copy = args->fn_copy;
+	struct child_status *cs = args->cs;
+
+	thread_current()->self_status = cs;
+
+	free(args);
+
+
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
 	process_init ();
 
-	if (process_exec (f_name) < 0)
+	if (process_exec (fn_copy) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
 }
 
+
+
+struct job_args {
+	struct thread *th;
+	struct intr_frame *itrf;
+	struct child_status *cs;
+};
+
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
+	struct thread *curr = thread_current();
+	
+	struct job_args ja;
+
+	// malloc 불러오기
+	struct child_status *cs = malloc(sizeof *cs);	
+	if (cs == NULL) return TID_ERROR;
+	sema_init(&cs->wait_sema, 0);
+	sema_init(&cs->fork_sema, 0);
+	cs->exit_status = -1;
+
+	// thread_create aux 전달 값 묶음으로 추가 
+	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
+	ja.itrf = if_;
+	ja.th = curr;
+	ja.cs = cs;
+	
+	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name,
+			PRI_DEFAULT, __do_fork, &ja);
+
+			
+			
+	// thread_create 성공 여부 확인
+	if (tid == TID_ERROR){
+		free(cs);
+		return TID_ERROR;
+	} 
+
+	sema_down(&cs->fork_sema);
+	
+	// child_status 생성
+	cs->child_pid = tid;
+	
+	// 반환값 부모의 thread child_list 에 저장
+	list_push_back(&curr->child_list, &cs->child_elem);
+
+	return tid;
+
 }
 
 #ifndef VM
@@ -131,12 +218,18 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	
+	struct job_args *ja = (struct job_args *) aux;
+	struct thread *parent = ja->th;
+	
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = ja->itrf;
 	bool succ = true;
 
+	// 자식 thread 에 본인 cs 기록 (종료할 때 필요)
+	current->self_status = ja->cs;
+	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -163,6 +256,12 @@ __do_fork (void *aux) {
 
 	process_init ();
 
+	// sema_up(&parent->child_status->fork_sema);
+	sema_up(&ja->cs->fork_sema);
+
+	// if_ 의 rax 0으로
+	if_.R.rax = 0;
+	
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
@@ -212,18 +311,47 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
+	// 현제 스레드를 불러옴
+	// child_status child 변수를 NULL로 선언
+	// list_elem e를 선언
+	struct thread *t = thread_current();
+	struct child_status *child = NULL;
+	struct list_elem *e;
+	
 
-	while (true) {
-		barrier();
+	//for child_list를 탐색
+	for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = list_next(e)) {
+		struct child_status *cs = list_entry(e, struct child_status, child_elem);
+		if (child_tid == cs->child_pid) {
+			child = cs;
+			break;
+		}
 	}
+	
+	// 내 자식아니거나 | 리스트에 없다
+	if (child == NULL) {
+		// 예외 return -1;
+		return -1;
+	}
+		
+	// sema_down(부모)
+	sema_down(&child->wait_sema);
+	
+	// 자식 프로세스의 종료코드 반환값을 명시적으로 선언
+	int exit_status = child->exit_status;
 
+	// list에서 지워주고
+	list_remove(&child->child_elem);
 
-	return -1;
+	// free
+	free(child);
+
+	return exit_status;
 }
 
 
@@ -239,10 +367,19 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	// Process Termination Message
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	if (curr->pml4 != NULL)
+		printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
 	
 
 	process_cleanup ();
+
+	// TDOO sema_up 부모 스레드
+	if(curr->self_status != NULL){
+		// 자식 사라지기 전에 exit status 기록
+		curr->self_status->exit_status = curr->exit_status;
+		// 기다리던 부모 깨우기
+		sema_up(&curr->self_status->wait_sema);
+	}
 }
 	
 
@@ -374,10 +511,10 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	//# Argument Passing 구현 
 	char *token, *save_ptr;
-	char *argv[128];
+	char *argv[64];
 	int argc = 0;
 	int len;
-	char *address[128];
+	char *address[64];
 
 	//# Argument Passing 1 : 명령어 파싱
 	// 참고 : file_name 변수는 const. 복사 안해도 작동은 하지만 하는게 더 클린함

@@ -10,6 +10,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -57,11 +59,23 @@ exit (int status) {
 }
 
 pid_t
-fork (const char *thread_name){
+fork (const char *thread_name, struct intr_frame *f){
+	// 1) thread_name 주소 검사
+	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name)){
+		exit(-1);
+	}
+
+	// 2) process_fork 호출 및 반환
+	return process_fork(thread_name, f);
+
 }
 
 int
 exec (const char *file) {
+	if (file == NULL || !is_user_vaddr(file) || !pml4_get_page(thread_current()->pml4, file)){
+		exit(-1);
+	}
+
 	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
 	char *file_name = palloc_get_page(0);
 	memcpy(file_name, file, strlen(file) + 1);
@@ -76,6 +90,7 @@ exec (const char *file) {
 
 int
 wait (pid_t pid) {
+	return process_wait(pid);
 }
 
 bool
@@ -133,7 +148,6 @@ close (int fd) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	printf ("system call!\n");
 	int syscall_num = f->R.rax;
 
 	switch (syscall_num) {
@@ -144,7 +158,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit (f->R.rdi);
 			break;
 		case SYS_FORK:
-			f->R.rax = fork ((const char *)f->R.rdi);
+			f->R.rax = fork ((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
 			f->R.rax = exec ((const char *)f->R.rdi);
