@@ -1,10 +1,10 @@
-#include "userprog/process.h"
 #include <debug.h>
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "userprog/process.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
@@ -27,7 +27,11 @@
 
 #define THREAD_NAME_MAX  16 //# Thread 이름은 최대 14 캐릭터
 
-
+struct job_args {
+	struct thread *th;
+	struct intr_frame *itrf;
+	bool is_success;
+};
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
@@ -86,10 +90,50 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
+	struct thread *curr = thread_current();
+	
+	struct job_args ja;
+
+	// // malloc 불러오기
+	// struct child_status *cs = malloc(sizeof *cs);	
+	// if (cs == NULL) return TID_ERROR;
+	// sema_init(&cs->wait_sema, 0);
+	// sema_init(&cs->fork_sema, 0);
+	// cs->exit_status = -1;
+
+	// thread_create aux 전달 값 묶음으로 추가 
+	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
+	ja.is_success = false;
+	ja.itrf = if_;
+	ja.th = curr;
+	
+	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name,
+			PRI_DEFAULT, __do_fork, &ja);
+
+			
+			
+	// thread_create 성공 여부 확인
+	if (tid == TID_ERROR){
+		return TID_ERROR;
+	} 
+
+	sema_down(&curr->child_field->fork_sema);
+	
+	if (!ja.is_success) {
+		return TID_ERROR;
+	}
+
+	// child_status 생성
+	curr->child_field->tid = tid;
+	
+	// 반환값 부모의 thread child_list 에 저장
+	list_push_back(&curr->child_list, &curr->child_field->elem);
+
+	return tid;
+
 }
 
 #ifndef VM
@@ -102,23 +146,23 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *parent_page;
 	void *newpage;
 	bool writable;
+	
+	/* 1. TODO: parent_page가 커널 페이지라면 즉시 반환한다. */
 
-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-
-	/* 2. Resolve VA from the parent's page map level 4. */
+	/* 2. 상위 페이지 맵 레벨 4로부터 VA를 해석(resolve)한다. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. TODO: 하위 항목에 대한 새 PAL_USER 페이지를 할당하고 결과를 다음으로 설정합니다. 
+		* TODO: NEWPAGE. */
 
-	/* 4. TODO: Duplicate parent's page to the new page and
-	 *    TODO: check whether parent's page is writable or not (set WRITABLE
-	 *    TODO: according to the result). */
+	/* 4. TODO: 부모의 페이지를 새 페이지로 복제하고,
+	*    TODO: 부모의 페이지가 쓰기 가능한지 확인하여
+	*    TODO: 그 결과에 따라 WRITABLE 여부를 설정한다. */
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
-		/* 6. TODO: if fail to insert page, do error handling. */
+		/* 6. TODO: 페이지 삽입에 실패할 경우, 오류 처리를 수행한다. */
 	}
 	return true;
 }
@@ -131,14 +175,22 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	
+	struct job_args *ja = (struct job_args *) aux;
+	struct thread *parent = ja->th;
+	
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = ja->itrf;
 	bool succ = true;
-
+	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+
+	if_.R.rax = 0;
+
+	ja->is_success = true;
+	sema_up(&parent->child_field->fork_sema);
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -163,11 +215,14 @@ __do_fork (void *aux) {
 
 	process_init ();
 
+	
+	
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
-	thread_exit ();
+	sema_up(&parent->child_field->fork_sema);
+	thread_exit (); 
 }
 
 /* Switch the current execution context to the f_name.
@@ -212,18 +267,38 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
+	struct thread *t = thread_current();
+	struct child_status *child = NULL;
+	struct list_elem *e;
 
-	while (true) {
-		barrier();
+	// 뒤로 보내 면서 탐색
+	for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = list_next(e)) {
+		struct child_status *cs = list_entry(e, struct child_status, elem);
+		// 호출 때 받아온 child_tid가 자식 tid와 같다면 자식에 cs를 넣고 멈춤
+		if (child_tid == cs->tid) {
+			child = cs;
+			break;
+		}
 	}
 
+	// 예외) 무조건 -1 반환
+	if (child == NULL) {
+		return -1;
+	}
 
-	return -1;
+	sema_down(&child->wait_sema);
+
+	// 필드에 exit_status를 만들 필요가 없나?
+	int exit_status = child->exit_status;
+	list_remove(&child->elem);
+	free(child);
+
+	return exit_status;
 }
 
 
@@ -232,23 +307,29 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
+	
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	struct thread *curr = thread_current ();
 	// Process Termination Message
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	if (curr->pml4 != NULL) {
+		printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	}
+	
+
+	if (curr->child_field != NULL) {
+		// child_field의 exit_status를 exit()에서 받아온 exit_status로
+		curr->child_field->exit_status = curr->exit_status;
+		//자식이 나갔으니 부모를 깨움
+		sema_up(&curr->child_field->wait_sema);
+	}
 	
 
 	process_cleanup ();
 }
-	
-
-
-
-
 
 
 /* Free the current process's resources. */

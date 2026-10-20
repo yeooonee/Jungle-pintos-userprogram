@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -87,6 +88,15 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct lock;
 
+/* 자식 스레드 상태 */
+struct child_status {
+	tid_t tid;
+	struct list_elem elem;
+	int exit_status;
+	struct semaphore wait_sema;
+	struct semaphore fork_sema;
+};
+
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
@@ -103,6 +113,12 @@ struct thread {
 
 	// USERPROG NEW FIELDS
 	int exit_status;	// 종료 코드
+
+	// 구조체 연결
+	struct child_status *child_field;
+
+	// 자식 리스트
+	struct list child_list;
 
 
 #ifdef USERPROG

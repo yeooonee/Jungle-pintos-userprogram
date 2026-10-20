@@ -57,7 +57,15 @@ exit (int status) {
 }
 
 pid_t
-fork (const char *thread_name){
+fork (const char *thread_name, struct intr_frame *if_){
+	// 1) thread_name 주소 검사
+	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name) ){
+		exit(-1);
+	}
+
+	// 2) process_fork 호출 및 반환
+	return process_fork(thread_name, if_);
+
 }
 
 int
@@ -76,6 +84,7 @@ exec (const char *file) {
 
 int
 wait (pid_t pid) {
+	process_wait(pid);
 }
 
 bool
@@ -100,10 +109,24 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
-	if (fd == 1) {
-		putbuf (buffer, size);
-		return size;
+	
+	if (buffer != NULL) {
+		if (fd == 1) {
+			putbuf(buffer, size);
+			return size;
+		}
+		else {
+			exit(-1);
+		}
 	}
+
+	
+	
+	
+	// if (fd == 1) {
+	// 	putbuf (buffer, size);
+	// 	return size;
+	// }
 
 
 
@@ -132,8 +155,8 @@ close (int fd) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
-	printf ("system call!\n");
+syscall_handler (struct intr_frame *f) {
+
 	int syscall_num = f->R.rax;
 
 	switch (syscall_num) {
@@ -144,7 +167,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit (f->R.rdi);
 			break;
 		case SYS_FORK:
-			f->R.rax = fork ((const char *)f->R.rdi);
+			f->R.rax = fork ((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
 			f->R.rax = exec ((const char *)f->R.rdi);

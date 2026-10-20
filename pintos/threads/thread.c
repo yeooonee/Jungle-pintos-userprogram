@@ -187,9 +187,9 @@ thread_create (const char *name, int priority,
 
 	/* Allocate thread. */
 	t = palloc_get_page (PAL_ZERO);
-	if (t == NULL)
+	if (t == NULL) {
 		return TID_ERROR;
-
+	}
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
@@ -204,9 +204,28 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	
+	/* exit() 및 wait() 함수를 위한 초기 설정 */
+	struct child_status *cs = malloc(sizeof(struct child_status));
+	if (cs == NULL) {
+		palloc_free_page(t);
+		return TID_ERROR;
+	}
+	// 초기화
+	cs->tid = tid;
+	cs->exit_status = 0;
+	sema_init(&cs->fork_sema, 0);
+	sema_init(&cs->wait_sema, 0);
+	
+	// 부모(th_cur)의 리스트에 자식의 요소 넣기
+	list_push_back(&thread_current()->child_list, &cs->elem);
+
+	// 생성중인 스레드에 malloc 및 초기화한 child_status를 저장
+	t->child_field = cs;
+
 
 	/* Add to run queue. */
-	thread_unblock (t);
+	thread_unblock (t); 
 
 	if (thread_current()->priority < priority) thread_yield();
 
@@ -436,6 +455,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->waiting_lock = NULL;
 	t->wakeup_time = 0;
 	t->magic = THREAD_MAGIC;
+	list_init(&t->child_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
