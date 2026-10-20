@@ -212,18 +212,47 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
+	// 현제 스레드를 불러옴
+	// child_status child 변수를 NULL로 선언
+	// list_elem e를 선언
+	struct thread *t = thread_current();
+	struct child_status *child = NULL;
+	struct list_elem *e;
+	
 
-	while (true) {
-		barrier();
+	//for child_list를 탐색
+	for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = list_next(e)) {
+		struct child_status *cs = list_entry(e, struct child_status, child_elem);
+		if (child_tid == cs->child_pid) {
+			child = cs;
+			break;
+		}
 	}
+	
+	// 내 자식아니거나 | 리스트에 없다
+	if (child == NULL) {
+		// 예외 return -1;
+		return -1;
+	}
+		
+	// sema_down(부모)
+	sema_down(&child->wait_sema);
+	
+	// 자식 프로세스의 종료코드 반환값을 명시적으로 선언
+	int exit_status = child->exit_status;
 
+	// list에서 지워주고
+	list_remove(&child->child_elem);
 
-	return -1;
+	// free
+	free(child);
+
+	return exit_status;
 }
 
 
@@ -243,6 +272,11 @@ process_exit (void) {
 	
 
 	process_cleanup ();
+
+	// TDOO sema_up 부모 스레드
+	if(!curr->status){
+		sema_up(curr);
+	}
 }
 	
 

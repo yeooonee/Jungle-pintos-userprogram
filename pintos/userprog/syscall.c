@@ -58,6 +58,15 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name){
+	// 현재 프로세스 복제한 새 프로세스 생성
+		// 복제 대상 (가상 메모리 공간, 파일 디스크립터, 레지스터)
+	// 반환값 (부모는 자식이 복제를 성공적으로 마쳤는지 알기 전까지 반환 금지)
+		// 성공하면 자식 pid, 
+		// 실패하면 TID_ERROR
+		// 자식 0
+	// 반환값 부모의 thread child_list 에 저장
+	
+
 }
 
 int
@@ -76,6 +85,7 @@ exec (const char *file) {
 
 int
 wait (pid_t pid) {
+	return process_wait(pid);
 }
 
 bool
