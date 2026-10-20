@@ -293,6 +293,7 @@ __do_fork (void *aux) {
 	
 error:
 	cs->fork_success = false;
+	current->self_status = NULL;
 	free(ja);
 	sema_up(&cs->fork_sema);
 	thread_exit ();
