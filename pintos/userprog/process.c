@@ -131,6 +131,8 @@ struct job_args {
 	struct thread *th;
 	struct intr_frame *itrf;
 	struct child_status *cs;
+	bool result_chk;
+
 };
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
@@ -153,6 +155,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	ja.itrf = if_;
 	ja.th = curr;
 	ja.cs = cs;
+	ja.result_chk = false;
 	
 	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
@@ -168,6 +171,11 @@ process_fork (const char *name, struct intr_frame *if_) {
 	} 
 
 	sema_down(&cs->fork_sema);
+	
+	if (!ja.result_chk) {
+		free(cs);
+		return TID_ERROR;
+	}
 	
 	// child_status 생성
 	cs->child_pid = tid;
@@ -226,9 +234,10 @@ __do_fork (void *aux) {
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if = ja->itrf;
 	bool succ = true;
+	struct child_status *cs = ja->cs;
 
 	// 자식 thread 에 본인 cs 기록 (종료할 때 필요)
-	current->self_status = ja->cs;
+	current->self_status = cs;
 	
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -256,8 +265,10 @@ __do_fork (void *aux) {
 
 	process_init ();
 
+	ja->result_chk = true;
+
 	// sema_up(&parent->child_status->fork_sema);
-	sema_up(&ja->cs->fork_sema);
+	sema_up(&cs->fork_sema);
 
 	// if_ 의 rax 0으로
 	if_.R.rax = 0;
@@ -266,6 +277,8 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
+	current->self_status = NULL;
+	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
 
