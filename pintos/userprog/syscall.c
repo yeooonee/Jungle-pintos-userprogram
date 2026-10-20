@@ -12,6 +12,8 @@
 #include "intrinsic.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "threads/palloc.h"
+#include <string.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
