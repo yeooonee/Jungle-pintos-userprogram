@@ -325,7 +325,7 @@ process_exec (void *f_name) {
 	/* If load failed, quit. */
 	// palloc_free_page (file_name);
 	if (!success)
-		return -1;
+		exit(-1);
 
 	/* Start switched process. */
 	do_iret (&_if);
