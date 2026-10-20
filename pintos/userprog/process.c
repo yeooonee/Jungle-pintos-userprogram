@@ -157,10 +157,10 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	// thread_create aux 전달 값 묶음으로 추가 
 	// TODO 어떤 식으로 aux 넘길지 (if_, current_thread)
-	ja.itrf = if_;
-	ja.th = curr;
-	ja.cs = cs;
-	ja.result_chk = false;
+	ja->itrf = if_;
+	ja->th = curr;
+	ja->cs = cs;
+	ja->result_chk = false;
 	
 	// 현재 프로세스 복제한 새 프로세스 생성
 	/* Clone current thread to new thread.*/
@@ -176,7 +176,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	sema_down(&cs->fork_sema);
 	
-	if (!ja.result_chk) {
+	if (!ja->result_chk) {
 		free(cs);
 		return TID_ERROR;
 	}
@@ -253,7 +253,6 @@ __do_fork (void *aux) {
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if = ja->itrf;
 	bool succ = true;
-	struct child_status *cs = ja->cs;
 
 	// 자식 thread 에 본인 cs 기록 (종료할 때 필요)
 	current->self_status = cs;
