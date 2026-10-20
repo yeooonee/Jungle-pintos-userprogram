@@ -41,6 +41,11 @@ process_init (void) {
 	struct thread *current = thread_current ();
 }
 
+struct task_args {
+	char *fn_copy;
+	struct child_status *cs;
+};
+
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
  * before process_create_initd() returns. Returns the initd's
@@ -58,28 +63,64 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	struct child_status *cs = malloc(sizeof *cs);	
+	struct task_args *args = malloc(sizeof *args);
+	
+	if (cs == NULL) {
+		palloc_free_page (fn_copy);
+		free(args);
+		return TID_ERROR;
+	}else if (args == NULL){
+		free(cs);
+		palloc_free_page (fn_copy);
+		return TID_ERROR;
+	}
+	
+	sema_init(&cs->wait_sema, 0);
+	sema_init(&cs->fork_sema, 0);
+	cs->exit_status = -1;
+
+	args->cs = cs;
+	args->fn_copy = fn_copy;
+
 	char file_name_cpy[THREAD_NAME_MAX];
 	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
 	char *file_name_tkn, *save_ptr;
 	file_name_tkn = strtok_r (file_name_cpy, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
+	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, args);
+	if (tid == TID_ERROR){
 		palloc_free_page (fn_copy);
+		free(cs);
+		free(args);
+		return TID_ERROR;
+	}
+	cs->child_pid = tid;
+	struct thread *curr = thread_current();
+	list_push_back (&curr->child_list, &cs->child_elem);
 	return tid;
 }
 
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
+	struct task_args *args = (struct task_args *) f_name;
+	char *fn_copy = args->fn_copy;
+	struct child_status *cs = args->cs;
+
+	thread_current()->self_status = cs;
+
+	free(args);
+
+
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
 	process_init ();
 
-	if (process_exec (f_name) < 0)
+	if (process_exec (fn_copy) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
 }
@@ -217,6 +258,9 @@ __do_fork (void *aux) {
 
 	// sema_up(&parent->child_status->fork_sema);
 	sema_up(&ja->cs->fork_sema);
+
+	// if_ 의 rax 0으로
+	if_.R.rax = 0;
 	
 	/* Finally, switch to the newly created process. */
 	if (succ)
@@ -323,14 +367,18 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	// Process Termination Message
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
+	if (curr->pml4 != NULL)
+		printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
 	
 
 	process_cleanup ();
 
 	// TDOO sema_up 부모 스레드
-	if(!curr->status){
-		sema_up(curr);
+	if(curr->self_status != NULL){
+		// 자식 사라지기 전에 exit status 기록
+		curr->self_status->exit_status = curr->exit_status;
+		// 기다리던 부모 깨우기
+		sema_up(&curr->self_status->wait_sema);
 	}
 }
 	

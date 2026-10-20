@@ -59,13 +59,14 @@ exit (int status) {
 }
 
 pid_t
-fork (const char *thread_name){
+fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
-	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || pml4_get_page(thread_name, NULL) ){
+	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name)){
 		exit(-1);
 	}
 
 	// 2) process_fork 호출 및 반환
+	return process_fork(thread_name, f);
 
 }
 
@@ -143,7 +144,6 @@ close (int fd) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	printf ("system call!\n");
 	int syscall_num = f->R.rax;
 
 	switch (syscall_num) {
@@ -154,7 +154,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit (f->R.rdi);
 			break;
 		case SYS_FORK:
-			f->R.rax = fork ((const char *)f->R.rdi);
+			f->R.rax = fork ((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
 			f->R.rax = exec ((const char *)f->R.rdi);
