@@ -126,7 +126,6 @@ close (int fd) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	printf ("system call!\n");
 	int syscall_num = f->R.rax;
 
 	switch (syscall_num) {

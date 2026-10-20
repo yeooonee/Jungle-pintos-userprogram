@@ -21,6 +21,7 @@
 #include "intrinsic.h"
 #ifdef VM
 #include "vm/vm.h"
+#include "threads/malloc.h"
 #endif
 
 
@@ -461,7 +462,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *argv[128];
 	int argc = 0;
 	int len;
-	char *address[128];
 
 	//# Argument Passing 1 : 명령어 파싱
 	// 참고 : file_name 변수는 const. 복사 안해도 작동은 하지만 하는게 더 클린함
@@ -470,6 +470,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	memcpy(file_name_cpy, file_name, strlen(file_name) + 1);
 	for (token = strtok_r (file_name_cpy, " ", &save_ptr); token != NULL; 
 		token = strtok_r (NULL, " ", &save_ptr)) {
+		if (argc >= 64) break;
 		argv[argc] = token;
 		argc++;
 	}
@@ -559,7 +560,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		len = strlen(argv[i]) + 1;
 		if_->rsp -= len;
 		memcpy((void*)if_->rsp, (void*)argv[i], len);
-		address[i] = (char*)if_->rsp;
+		argv[i] = (char*)if_->rsp;
 	}
 
 	//# Argument Passing 3 : 패딩 (스택 포인터를 8의 배수로 하기 위해 마지막 3비트 제거)
@@ -575,7 +576,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	//# Argument Passing 5 : 문자열이 어디 있는지 알려주는 포인터를 스택 적재
 	for (int i = argc - 1; i >= 0; i--) {
 		if_->rsp -= sizeof(uint64_t);
-		*(char**)if_->rsp = address[i];
+		*(char**)if_->rsp = argv[i];
 	}
 
 	//# Argument Passing 6 : rdi, rsi 레지스터 저장
