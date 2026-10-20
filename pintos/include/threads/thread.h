@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -87,6 +88,8 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct lock;
 
+typedef int pid_t;
+
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
@@ -97,12 +100,20 @@ struct thread {
 	struct list donation_list;          /* Threads donating to this thread. */
 	struct list_elem donation_elem;     /* Element in another thread's donation list. */
 	struct lock *waiting_lock;          /* Lock this thread is waiting to acquire. */
+	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	int64_t wakeup_time;				/*해제되어야 하는 시간*/
 
-	// USERPROG NEW FIELDS
-	int exit_status;	// 종료 코드
+	//! 추가 필드
+	struct intr_frame parent_if;     //# fork 복사용 (부모 레지스터 상태 복사)
+	struct list children;            //# child_info 목록
+	struct semaphore fork_sema;      //# fork 후 자식 초기화 성공/실패 대기
+	struct semaphore exec_sema;      //# exec 로드 완료 대기
+	bool fork_success;			     //# fork 복사 성공 여부
+	bool exec_success;               //# exec 로드 성공 여부
+	struct child_info *child_info;   //# 자신의 child_info 직접 참조
+
 
 
 #ifdef USERPROG
@@ -118,6 +129,17 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
+
+
+//! 추가 구조체
+struct child_info {
+    int exit_status;				//# 자식의 종료 코드
+    pid_t child_pid;				
+    struct list_elem child_elem;	//# 부모의 children 리스트용
+    struct semaphore wait_sema;
+};
+
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

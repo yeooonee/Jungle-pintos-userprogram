@@ -44,14 +44,26 @@ syscall_init (void) {
 
 
 
+//# 하는 일 : 
 void
 halt (void) {
 	power_off ();
 }
 
+
+//# 하는 일
+//# 동작 순서 : exit -> thread_exit -> process_exit
 void
 exit (int status) {
+	struct thread* curr = thread_current();
 
+	//# exit status 저장. process_exit에서 child_info에 넘겨줄 때 씀
+	if (curr->child_info != NULL) {
+		curr->child_info->exit_status = status;
+	}
+
+	//# 내부에서 process_exit() 호출
+	thread_exit();	
 }
 
 pid_t
@@ -63,8 +75,10 @@ exec (const char *file) {
 
 }
 
+//# 하는 일
 int
 wait (pid_t pid) {
+	return process_wait(pid);
 }
 
 bool

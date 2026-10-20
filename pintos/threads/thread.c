@@ -436,6 +436,15 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->waiting_lock = NULL;
 	t->wakeup_time = 0;
 	t->magic = THREAD_MAGIC;
+
+	//# SYSCALL 추가 필드 초기화
+	//# parent_if는 fork 할 때 memcpy로 덮어쓸꺼라 쓰레기값으로 두어도됨
+	list_init(&t->children);
+	sema_init(&t->fork_sema, 0);
+	sema_init(&t->exec_sema, 0);
+	t->fork_success = false;
+	t->exec_success = false;
+	t->child_info = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

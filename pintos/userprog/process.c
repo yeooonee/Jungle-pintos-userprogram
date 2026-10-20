@@ -212,18 +212,38 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 
+	struct thread* curr = thread_current();
+	struct child_info* ci = NULL;
 
-	while (true) {
-		barrier();
+	//# 1. children 리스트에서 tid로 자식 찾기
+	for (struct list_elem *e = list_begin(&curr->children); 
+		e != list_end(&curr->children); e = list_next(e)) {
+		struct child_info* c = list_entry(e, struct child_info, child_elem);
+		if (c->child_pid == child_tid) {
+			ci = c;
+			break;
+		}
 	}
 
+	//# 2. 자식 못찾으면 -1 반환
+	if (ci == NULL) {
+		return -1;
+	}
 
-	return -1;
+	//# 3. 자식 종료까지 대기
+	sema_down (&ci->wait_sema);
+
+	//# 4. exit_status 읽고 자식을 리스트에서 제거 및 free
+	int status = ci->exit_status;
+	list_remove(&ci->child_elem);
+	free(ci);
+
+	return status;
 }
 
 
@@ -232,16 +252,29 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	// Process Termination Message
-	printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
-	
+	struct thread *curr = thread_current ();
 
+	//# 1. 열린 fd 전부 닫기
+
+	//# 2. 자식들의 child_info 구조체 free
+	struct list_elem *e = list_begin(&curr->children);
+	while (e != list_end(&curr->children)) {
+		struct child_info *ci = list_entry(e, struct child_info, child_elem);
+		e = list_remove(e);
+		free(ci);
+	}
+
+	//# 3. 부모에게 자식 프로세스 끝났다고 sema_up
+	sema_up(&curr->child_info->wait_sema);
+	
+	//# 4. Process Termination Message
+	printf("%s: exit(%d)\n", curr->name, curr->child_info->exit_status);
+	
 	process_cleanup ();
 }
 	
