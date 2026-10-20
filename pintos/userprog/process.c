@@ -40,6 +40,15 @@ process_init (void) {
 	struct thread *current = thread_current ();
 }
 
+
+//# initd용 aux 구조체 : file_name + child_info wrapper
+struct initd_arg {
+    char *file_name;
+    struct child_info *child_info;
+};
+
+
+
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
  * before process_create_initd() returns. Returns the initd's
@@ -57,28 +66,64 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	//# ======================================================
+	
+	struct child_info *ci = malloc(sizeof(struct child_info));
+    if (ci == NULL) {
+        palloc_free_page(fn_copy);
+        return TID_ERROR;
+    }
+
+	ci->exit_status = -1;
+    sema_init(&ci->wait_sema, 0);
+
+    struct initd_arg *arg = malloc(sizeof(struct initd_arg));
+    if (arg == NULL) {
+        palloc_free_page(fn_copy);
+        free(ci);
+        return TID_ERROR;
+    }
+    arg->file_name = fn_copy;
+    arg->child_info = ci;
+
+	//# ======================================================
+
 	char file_name_cpy[THREAD_NAME_MAX];
 	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
 	char *file_name_tkn, *save_ptr;
 	file_name_tkn = strtok_r (file_name_cpy, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name_tkn, PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
-		palloc_free_page (fn_copy);
-	return tid;
+	tid = thread_create(file_name_tkn, PRI_DEFAULT, initd, arg);
+    if (tid == TID_ERROR) {
+        palloc_free_page(fn_copy);
+        free(ci);
+        free(arg);
+        return TID_ERROR;
+    }
+
+    ci->child_pid = tid;
+    list_push_back(&thread_current()->children, &ci->child_elem);
+
+    return tid;
 }
 
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
+	struct initd_arg *arg = (struct initd_arg *) f_name;
+    char *file = arg->file_name;
+    struct child_info *ci = arg->child_info;
+    free(arg);
+    thread_current()->child_info = ci;
+
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
 	process_init ();
 
-	if (process_exec (f_name) < 0)
+	if (process_exec (file) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
 }
