@@ -106,6 +106,12 @@ wait (pid_t pid) {
 
 static bool
 create (const char *file, unsigned initial_size) {
+	check_address(file);						//# 포인터 유효성 검증
+	lock_acquire(&filesys_lock);				//# 파일시스템 락 설정
+
+	bool result = filesys_create(file, initial_size);  //# 파일 생성
+	lock_release(&filesys_lock);
+	return result;
 }
 
 static bool
