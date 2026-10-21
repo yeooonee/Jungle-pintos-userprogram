@@ -12,6 +12,8 @@
 #include "intrinsic.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "threads/palloc.h"
+#include <string.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -84,7 +86,7 @@ exec (const char *file) {
 	palloc_free_page(file_name);
 	
 	if (rtn == -1) {
-		return -1;
+		exit(-1);
 	}
 }
 
