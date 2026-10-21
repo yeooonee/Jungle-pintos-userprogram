@@ -14,9 +14,13 @@
 #include "threads/mmu.h"
 #include "threads/palloc.h"
 #include <string.h>
+#include "include/threads/synch.h"
+#include "filesys/filesys.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+struct lock file_lock;
 
 typedef int pid_t;
 
@@ -44,6 +48,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	lock_init(&file_lock);
 }
 
 
@@ -66,7 +72,7 @@ range_chk (void *args, void *end_args){
 		exit(-1);
 	}
 	if (end_args != NULL){
-		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= &end_args - 1; i += PGSIZE){
+		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
 			if (!is_user_vaddr(i) || !pml4_get_page(thread_current()->pml4, (const void *) i)){
 				exit(-1);
 			}
@@ -115,6 +121,25 @@ remove (const char *file) {
 
 int
 open (const char *file) {
+	range_chk(file, NULL);
+
+	// 파일 오픈
+	lock_acquire(&file_lock);
+	struct file *file_rtn = filesys_open(file);
+	lock_release(&file_lock);
+
+	if (file_rtn == NULL) return -1;
+
+	// 파일 fd 테이블에 저장하기
+	struct file **curr_file_p = thread_current()->file_p;
+
+	for (int i = FD_START; i < FD_MAX; i++){
+		if (curr_file_p[i] == NULL) {
+			curr_file_p[i] = file_rtn;
+			return i;
+		}
+	}
+
 }
 
 int
@@ -132,11 +157,16 @@ write (int fd, const void *buffer, unsigned size) {
 	if (fd == 1) {
 		putbuf (buffer, size);
 		return size;
-	}
-	
-	// else {
-	// 	return 
+	} 
+
+	// else if (fd == 2){
+	// 	struct file *f = open();
+	// 	return file_write(f, );
 	// }
+	
+	else {
+		exit(-1);
+	}
 
 
 
