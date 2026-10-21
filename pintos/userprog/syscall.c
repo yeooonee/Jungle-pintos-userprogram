@@ -4,6 +4,7 @@
 #include <syscall-nr.h>
 #include "kernel/stdio.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
@@ -18,8 +19,9 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
-typedef int pid_t;
+struct lock filesys_lock;
 
+typedef int pid_t;
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -35,6 +37,7 @@ typedef int pid_t;
 
 void
 syscall_init (void) {
+	lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
