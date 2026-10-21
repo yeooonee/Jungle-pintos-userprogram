@@ -16,6 +16,7 @@
 #include <string.h>
 #include "include/threads/synch.h"
 #include "filesys/filesys.h"
+#include "filesys/off_t.h"
 
 
 void syscall_entry (void);
@@ -161,6 +162,16 @@ open (const char *file) {
 
 static int
 filesize (int fd) {
+	struct thread *t = thread_current();
+
+	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+		return -1;
+	}
+	lock_acquire(&file_lock);
+	int length = file_length(t->file_p[fd]);
+	lock_release(&file_lock);
+
+	return length;
 }
 
 static int
@@ -226,14 +237,40 @@ write (int fd, const void *buffer, unsigned size) {
 
 static void
 seek (int fd, unsigned position) {
+	struct thread *t = thread_current();
+	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+		return;
+	}
+
+	lock_acquire(&file_lock);
+	file_seek(t->file_p[fd], position);
+	lock_release(&file_lock);
 }
 
 static unsigned
 tell (int fd) {
+	struct thread *t = thread_current();
+	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+		return -1;
+	}
+
+	lock_acquire(&file_lock);
+	unsigned re = file_tell(t->file_p[fd]);
+	lock_release(&file_lock);
+
+	return re;
 }
 
 static void
 close (int fd) {
+	struct thread *t = thread_current();
+	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+		return;
+	}
+	lock_acquire(&file_lock);
+	file_close(t->file_p[fd]);
+	lock_release(&file_lock);
+	t->file_p[fd] = NULL;
 }
 
 
