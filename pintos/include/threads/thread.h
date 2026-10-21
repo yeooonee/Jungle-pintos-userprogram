@@ -113,6 +113,7 @@ struct thread {
 	struct list child_list;
 	struct child_status *self_status; 
 	struct file **file_p;	// 파일 포인터
+	struct file *file_run;	// 실행 파일 포인터
 
 
 #ifdef USERPROG

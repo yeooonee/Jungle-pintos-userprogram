@@ -281,6 +281,14 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	// 파일 복사 
+	for (int i = FD_START; i < FD_MAX; i++){
+		if (parent->file_p[i] == NULL)
+			continue;
+		current->file_p[i] = file_duplicate(parent->file_p[i]);
+		if (current->file_p[i] == NULL) goto error;
+	}
+
 	process_init ();
 
 	ja->result_chk = true;
@@ -297,6 +305,7 @@ __do_fork (void *aux) {
 	
 error:
 	current->self_status = NULL;
+	
 	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
@@ -446,6 +455,10 @@ process_cleanup (void) {
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
 	}
+
+	// 실행파일 정리
+	file_close(curr->file_run);
+	curr->file_run = NULL;
 }
 
 /* Sets up the CPU for running user code in the nest thread.
@@ -676,7 +689,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	if (success){
+		file_deny_write(file);	// 쓰기 금지
+		t->file_run = file;
+	} else {
+		file_close (file);
+	}
 	if (file_name_cpy != NULL) {palloc_free_page(file_name_cpy); }
 	return success;
 }
