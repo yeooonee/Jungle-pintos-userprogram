@@ -123,6 +123,11 @@ create (const char *file, unsigned initial_size) {
 
 static bool
 remove (const char *file) {
+	range_chk(file, NULL);
+	lock_acquire(&file_lock);
+	bool result = filesys_remove(file);
+	lock_release(&file_lock);
+	return result;
 }
 
 static int
@@ -182,7 +187,7 @@ read (int fd, void *buffer, unsigned size) {
 	}
 
 	//# fd가 유효한 범위인지 확인
-	if (fd < 2 || fd >= MAX_FD) {
+	if (fd < FD_START || fd >= FD_MAX) {
 		return -1;
 	}
 	
