@@ -31,6 +31,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* file */
+#define FD_START 3
+#define FD_MAX (PGSIZE / sizeof (struct file *))
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -108,6 +112,7 @@ struct thread {
 	int exit_status;	// 종료 코드
 	struct list child_list;
 	struct child_status *self_status; 
+	struct file **file_p;	// 파일 포인터
 
 
 #ifdef USERPROG

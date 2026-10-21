@@ -14,9 +14,13 @@
 #include "threads/mmu.h"
 #include "threads/palloc.h"
 #include <string.h>
+#include "include/threads/synch.h"
+#include "filesys/filesys.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+struct lock file_lock;
 
 typedef int pid_t;
 
@@ -44,6 +48,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	lock_init(&file_lock);
 }
 
 
@@ -60,12 +66,24 @@ exit (int status) {
 	thread_exit ();
 }
 
+void
+range_chk (void *args, void *end_args){
+	if ((args == NULL) || !is_user_vaddr(args) || !pml4_get_page(thread_current()->pml4, args)){
+		exit(-1);
+	}
+	if (end_args != NULL){
+		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
+			if (!is_user_vaddr(i) || !pml4_get_page(thread_current()->pml4, (const void *) i)){
+				exit(-1);
+			}
+		}
+	}
+}
+
 pid_t
 fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
-	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name)){
-		exit(-1);
-	}
+	range_chk(thread_name, NULL);
 
 	// 2) process_fork 호출 및 반환
 	return process_fork(thread_name, f);
@@ -74,9 +92,7 @@ fork (const char *thread_name, struct intr_frame *f){
 
 int
 exec (const char *file) {
-	if (file == NULL || !is_user_vaddr(file) || !pml4_get_page(thread_current()->pml4, file)){
-		exit(-1);
-	}
+	range_chk(file, NULL);
 
 	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
 	char *file_name = palloc_get_page(0);
@@ -105,6 +121,31 @@ remove (const char *file) {
 
 int
 open (const char *file) {
+	range_chk(file, NULL);
+
+	// 파일 오픈
+	lock_acquire(&file_lock);
+	struct file *file_rtn = filesys_open(file);
+	lock_release(&file_lock);
+
+	if (file_rtn == NULL) return -1;
+
+	// 파일 fd 테이블에 저장하기
+	struct file **curr_file_p = thread_current()->file_p;
+
+	for (int i = FD_START; i < FD_MAX; i++){
+		if (curr_file_p[i] == NULL) {
+			curr_file_p[i] = file_rtn;
+			return i;
+		}
+	}
+	
+	lock_acquire(&file_lock);
+	file_close(file_rtn);
+	lock_release(&file_lock);
+
+	return -1;
+
 }
 
 int
@@ -117,19 +158,23 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	range_chk(buffer, buffer + size);
+
 	if (fd == 1) {
 		putbuf (buffer, size);
 		return size;
-	}
+	} 
 
+	if (FD_START > fd || fd >= FD_MAX) return -1;
 
+	struct file *curr_file_p = thread_current()->file_p[fd];
+	if (curr_file_p == NULL) return -1;
 
-
-	// else {
-	// 	struct file *f = 
-	// 	return file_write();
-	// }
+	lock_acquire(&file_lock);
+	off_t t = file_write(curr_file_p, buffer, size);
+	lock_release(&file_lock);
 	
+	return t;
 
 }
 
