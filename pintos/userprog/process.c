@@ -28,7 +28,7 @@
 
 #define THREAD_NAME_MAX  16 //# Thread 이름은 최대 14 캐릭터
 
-
+extern struct lock file_lock;
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
@@ -175,8 +175,10 @@ process_fork (const char *name, struct intr_frame *if_) {
 	} 
 
 	sema_down(&cs->fork_sema);
+	bool fork_ok = ja->result_chk;
+	free(ja);
 	
-	if (!ja->result_chk) {
+	if (!fork_ok) {
 		free(cs);
 		return TID_ERROR;
 	}
@@ -305,7 +307,6 @@ __do_fork (void *aux) {
 	
 error:
 	current->self_status = NULL;
-	
 	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
@@ -314,8 +315,11 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
-	bool success;
+	char *file_name = palloc_get_page(0);
+	if (file_name == NULL) {
+		return -1;
+	}
+	strlcpy(file_name, f_name, PGSIZE);
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -329,7 +333,8 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
-	success = load (file_name, &_if);
+	bool success = load (file_name, &_if);
+	palloc_free_page(file_name);
 
 	/* If load failed, quit. */
 	if (!success)
@@ -439,6 +444,14 @@ process_cleanup (void) {
 	supplemental_page_table_kill (&curr->spt);
 #endif
 
+	if (curr->file_run != NULL) {
+			// 실행파일 정리
+		lock_acquire(&file_lock);
+		file_close(curr->file_run);
+		lock_release(&file_lock);
+		curr->file_run = NULL;
+	}
+
 	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
 	 * to the kernel-only page directory. */
@@ -455,10 +468,6 @@ process_cleanup (void) {
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
 	}
-
-	// 실행파일 정리
-	file_close(curr->file_run);
-	curr->file_run = NULL;
 }
 
 /* Sets up the CPU for running user code in the nest thread.
@@ -575,7 +584,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	/* Open executable file. */
+	lock_acquire(&file_lock);
 	file = filesys_open (argv[0]); //# file_name에서 argv[0]로 수정
+	lock_release(&file_lock);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", argv[0]);
 		goto done;
@@ -690,10 +701,14 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	if (success){
+		lock_acquire(&file_lock);
 		file_deny_write(file);	// 쓰기 금지
+		lock_release(&file_lock);
 		t->file_run = file;
 	} else {
+		lock_acquire(&file_lock);
 		file_close (file);
+		lock_release(&file_lock);
 	}
 	if (file_name_cpy != NULL) {palloc_free_page(file_name_cpy); }
 	return success;
