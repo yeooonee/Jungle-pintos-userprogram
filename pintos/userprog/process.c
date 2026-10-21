@@ -323,7 +323,6 @@ process_exec (void *f_name) {
 	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
-	// palloc_free_page (file_name);
 	if (!success)
 		exit(-1);
 
@@ -399,6 +398,17 @@ process_exit (void) {
 	if (curr->pml4 != NULL)
 		printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
 	
+	//# fd_table 정리
+	if (curr->file_p != NULL) {
+		for (int i = FD_START; i < FD_MAX; i++) {
+			if (curr->file_p[i] != NULL) {
+				file_close(curr->file_p[i]);
+				curr->file_p[i] = NULL;
+			}
+		}
+		palloc_free_page(curr->file_p);
+		curr->file_p = NULL;
+	}
 
 	process_cleanup ();
 

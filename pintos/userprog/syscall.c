@@ -54,7 +54,7 @@ syscall_init (void) {
 
 
 
-void
+static void
 halt (void) {
 	power_off ();
 }
@@ -66,7 +66,7 @@ exit (int status) {
 	thread_exit ();
 }
 
-void
+static void
 range_chk (void *args, void *end_args){
 	if ((args == NULL) || !is_user_vaddr(args) || !pml4_get_page(thread_current()->pml4, args)){
 		exit(-1);
@@ -80,7 +80,7 @@ range_chk (void *args, void *end_args){
 	}
 }
 
-pid_t
+static pid_t
 fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
 	range_chk(thread_name, NULL);
@@ -90,7 +90,7 @@ fork (const char *thread_name, struct intr_frame *f){
 
 }
 
-int
+static int
 exec (const char *file) {
 	range_chk(file, NULL);
 
@@ -106,20 +106,31 @@ exec (const char *file) {
 	}
 }
 
-int
+static int
 wait (pid_t pid) {
 	return process_wait(pid);
 }
 
-bool
+static bool
 create (const char *file, unsigned initial_size) {
+	range_chk(file, NULL);					//# 포인터 유효성 검증
+	lock_acquire(&file_lock);				//# 파일시스템 락 설정
+
+	bool result = filesys_create(file, initial_size);  //# 파일 생성
+	lock_release(&file_lock);
+	return result;
 }
 
-bool
+static bool
 remove (const char *file) {
+	range_chk(file, NULL);
+	lock_acquire(&file_lock);
+	bool result = filesys_remove(file);
+	lock_release(&file_lock);
+	return result;
 }
 
-int
+static int
 open (const char *file) {
 	range_chk(file, NULL);
 
@@ -148,15 +159,50 @@ open (const char *file) {
 
 }
 
-int
+static int
 filesize (int fd) {
 }
 
-int
+static int
 read (int fd, void *buffer, unsigned size) {
+	struct thread *curr = thread_current();
+
+	//# buffer 포인터 유효성 검증
+	if (size == 0) {
+		return 0;
+	}
+	range_chk(buffer, buffer + size);
+
+	//# fd0 키보드에서 읽기
+	if (fd == 0) {
+		for (unsigned i = 0; i < size; i++) {
+			((char *)buffer)[i] = input_getc();
+		}
+		return size;
+	} 
+	
+	//# fd1 읽기 대상이 아니므로 -1 반환
+	if (fd == 1) {
+		return -1;
+	}
+
+	//# fd가 유효한 범위인지 확인
+	if (fd < FD_START || fd >= FD_MAX) {
+		return -1;
+	}
+	
+	//# fd2 : 파일에서 읽기
+	struct file *f = curr->file_p[fd];
+	if (f == NULL) {
+		return -1;
+	}
+	lock_acquire(&file_lock);				//# 파일시스템 락 설정
+	int result = file_read(f, buffer, size);
+	lock_release(&file_lock);
+	return result;
 }
 
-int
+static int
 write (int fd, const void *buffer, unsigned size) {
 	range_chk(buffer, buffer + size);
 
@@ -178,15 +224,15 @@ write (int fd, const void *buffer, unsigned size) {
 
 }
 
-void
+static void
 seek (int fd, unsigned position) {
 }
 
-unsigned
+static unsigned
 tell (int fd) {
 }
 
-void
+static void
 close (int fd) {
 }
 
