@@ -95,12 +95,12 @@ static int
 exec (const char *file) {
 	range_chk(file, NULL);
 
-	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
-	char *file_name = palloc_get_page(0);
-	memcpy(file_name, file, strlen(file) + 1);
+	// /* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
+	// char *file_name = palloc_get_page(0);
+	// memcpy(file_name, file, strlen(file) + 1);
 
-	int rtn = process_exec(file_name);
-	palloc_free_page(file_name);
+	int rtn = process_exec((void *) file);
+	// palloc_free_page(file_name);
 	
 	if (rtn == -1) {
 		exit(-1);
@@ -164,7 +164,7 @@ static int
 filesize (int fd) {
 	struct thread *t = thread_current();
 
-	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
 		return -1;
 	}
 	lock_acquire(&file_lock);
@@ -238,7 +238,7 @@ write (int fd, const void *buffer, unsigned size) {
 static void
 seek (int fd, unsigned position) {
 	struct thread *t = thread_current();
-	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
 		return;
 	}
 
@@ -264,7 +264,7 @@ tell (int fd) {
 static void
 close (int fd) {
 	struct thread *t = thread_current();
-	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
 		return;
 	}
 	lock_acquire(&file_lock);
