@@ -116,6 +116,11 @@ create (const char *file, unsigned initial_size) {
 
 static bool
 remove (const char *file) {
+	check_address(file);
+	lock_acquire(&filesys_lock);
+
+
+
 }
 
 static int
