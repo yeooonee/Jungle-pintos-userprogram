@@ -197,23 +197,35 @@ read (int fd, void *buffer, unsigned size) {
 
 static int
 write (int fd, const void *buffer, unsigned size) {
+	struct thread *curr = thread_current();
+
+	//# buffer 포인터 유효성 검증
+	check_address(buffer);
+	check_address(buffer + size - 1);
+
+	//# fd1 : 화면에 출력
 	if (fd == 1) {
 		putbuf (buffer, size);
 		return size;
+	} 
+
+	//# fd가 유효한 범위인지 확인
+	if (fd < 3 || fd >= MAX_FD) {
+		return -1;
 	}
-
-
-
-
-	// else {
-	// 	struct file *f = 
-	// 	return file_write();
-	// }
 	
-
+	//# fd2 : 파일에 쓰기
+	struct file *f = curr->fd_table[fd];
+	if (f == NULL) {
+		return -1;
+	}
+	lock_acquire(&filesys_lock);				//# 파일시스템 락 설정
+	int result = file_write(f, buffer, size);
+	lock_release(&filesys_lock);
+	return result;
 }
 
-void
+static void
 seek (int fd, unsigned position) {
 }
 
