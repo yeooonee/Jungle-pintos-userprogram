@@ -143,7 +143,7 @@ open (const char *file) {
 	lock_acquire(&file_lock);
 	file_close(file_rtn);
 	lock_release(&file_lock);
-	
+
 	return -1;
 
 }
@@ -165,22 +165,16 @@ write (int fd, const void *buffer, unsigned size) {
 		return size;
 	} 
 
-	// else if (fd == 2){
-	// 	struct file *f = open();
-	// 	return file_write(f, );
-	// }
+	if (FD_START > fd || fd >= FD_MAX) return -1;
+
+	struct file *curr_file_p = thread_current()->file_p[fd];
+	if (curr_file_p == NULL) return -1;
+
+	lock_acquire(&file_lock);
+	off_t t = file_write(curr_file_p, buffer, size);
+	lock_release(&file_lock);
 	
-	else {
-		exit(-1);
-	}
-
-
-
-	// else {
-	// 	struct file *f = 
-	// 	return file_write();
-	// }
-	
+	return t;
 
 }
 
