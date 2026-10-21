@@ -100,7 +100,6 @@ exec (const char *file) {
 	memcpy(file_name, file, strlen(file) + 1);
 
 	int rtn = process_exec(file_name);
-	palloc_free_page(file_name);
 	
 	if (rtn == -1) {
 		exit(-1);

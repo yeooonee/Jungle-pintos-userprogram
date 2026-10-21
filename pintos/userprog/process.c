@@ -178,6 +178,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	
 	if (!ja->result_chk) {
 		free(cs);
+		free(ja);
 		return TID_ERROR;
 	}
 	
@@ -186,6 +187,8 @@ process_fork (const char *name, struct intr_frame *if_) {
 	
 	// 반환값 부모의 thread child_list 에 저장
 	list_push_back(&curr->child_list, &cs->child_elem);
+
+	free(ja);
 
 	return tid;
 
@@ -305,7 +308,6 @@ __do_fork (void *aux) {
 	
 error:
 	current->self_status = NULL;
-	
 	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
@@ -330,6 +332,8 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+
+	palloc_free_page(file_name);
 
 	/* If load failed, quit. */
 	if (!success)
