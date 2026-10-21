@@ -139,6 +139,12 @@ open (const char *file) {
 			return i;
 		}
 	}
+	
+	lock_acquire(&file_lock);
+	file_close(file_rtn);
+	lock_release(&file_lock);
+	
+	return -1;
 
 }
 
