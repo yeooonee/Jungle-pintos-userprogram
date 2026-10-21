@@ -445,6 +445,10 @@ process_cleanup (void) {
 		pml4_activate (NULL);
 		pml4_destroy (pml4);
 	}
+
+	// 실행파일 정리
+	file_close(curr->file_run);
+	curr->file_run = NULL;
 }
 
 /* Sets up the CPU for running user code in the nest thread.
