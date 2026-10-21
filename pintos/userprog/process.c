@@ -281,6 +281,14 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	// 파일 복사 
+	for (int i = FD_START; i < FD_MAX; i++){
+		if (parent->file_p[i] == NULL)
+			continue;
+		current->file_p[i] = file_duplicate(parent->file_p[i]);
+		if (current->file_p[i] == NULL) goto error;
+	}
+
 	process_init ();
 
 	ja->result_chk = true;
@@ -297,6 +305,7 @@ __do_fork (void *aux) {
 	
 error:
 	current->self_status = NULL;
+	
 	sema_up(&cs->fork_sema);
 	thread_exit ();
 }
