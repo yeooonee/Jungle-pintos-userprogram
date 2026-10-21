@@ -12,8 +12,6 @@
 
 typedef int pid_t;
 
-#define MAX_FD 512
-
 
 /* States in a thread's life cycle. */
 enum thread_status {
