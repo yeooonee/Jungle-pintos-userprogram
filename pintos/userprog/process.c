@@ -320,11 +320,16 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	/* fd_table 재할당 (process_cleanup이 해제했으므로) */
+	struct thread *curr = thread_current();
+	curr->fd_table = palloc_get_page(0);
+	if (curr->fd_table != NULL)
+	memset(curr->fd_table, 0, PGSIZE);
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
-	// palloc_free_page (file_name);
 	if (!success)
 		exit(-1);
 
@@ -416,6 +421,19 @@ process_exit (void) {
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
+
+	//# fd_table 정리
+	if (curr->fd_table != NULL) {
+		for (int i = 3; i < MAX_FD; i++) {
+			if (curr->fd_table[i] != NULL) {
+				file_close(curr->fd_table[i]);
+				curr->fd_table[i] = NULL;
+			}
+		}
+		palloc_free_page(curr->fd_table);
+		curr->fd_table = NULL;
+	}
+
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
