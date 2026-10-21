@@ -675,7 +675,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	if (success){
+		file_deny_write(file);	// 쓰기 금지
+		t->file_run = file;
+	} else {
+		file_close (file);
+	}
 	if (file_name_cpy != NULL) {palloc_free_page(file_name_cpy); }
 	return success;
 }
