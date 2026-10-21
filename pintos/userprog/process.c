@@ -15,6 +15,7 @@
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
@@ -22,7 +23,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
-#include "threads/malloc.h"
+
 
 
 
