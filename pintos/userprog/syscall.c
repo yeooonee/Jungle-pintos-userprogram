@@ -71,7 +71,7 @@ exit (int status) {
 	thread_exit ();
 }
 
-pid_t
+static pid_t
 fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
 	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name)){
@@ -83,7 +83,7 @@ fork (const char *thread_name, struct intr_frame *f){
 
 }
 
-int
+static int
 exec (const char *file) {
 	if (file == NULL || !is_user_vaddr(file) || !pml4_get_page(thread_current()->pml4, file)){
 		exit(-1);
@@ -101,20 +101,20 @@ exec (const char *file) {
 	}
 }
 
-int
+static int
 wait (pid_t pid) {
 	return process_wait(pid);
 }
 
-bool
+static bool
 create (const char *file, unsigned initial_size) {
 }
 
-bool
+static bool
 remove (const char *file) {
 }
 
-int
+static int
 open (const char *file) {
 }
 
@@ -122,7 +122,7 @@ int
 filesize (int fd) {
 }
 
-int
+static int
 read (int fd, void *buffer, unsigned size) {
 }
 
@@ -148,11 +148,11 @@ void
 seek (int fd, unsigned position) {
 }
 
-unsigned
+static unsigned
 tell (int fd) {
 }
 
-void
+static void
 close (int fd) {
 }
 
