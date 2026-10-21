@@ -51,7 +51,15 @@ syscall_init (void) {
 
 
 
-void
+
+static void
+check_address (const void *addr) {
+	if (addr == NULL || !is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr)){
+		exit(-1);
+	}
+}
+
+static void
 halt (void) {
 	power_off ();
 }
