@@ -114,9 +114,33 @@ remove (const char *file) {
 
 static int
 open (const char *file) {
+	check_address(file);					//# 포인터 유효성 검증
+	lock_acquire(&filesys_lock);			//# 파일시스템 락 설정
+
+	struct file *f = filesys_open(file);	//# 파일 열기
+	lock_release(&filesys_lock);
+
+	if (f == NULL) {						//# 파일이 없거나, 열기 실패했는지 확인
+		return -1;
+	}
+	struct thread *curr = thread_current();
+	int fd = -1;
+	for (int i = 3; i < MAX_FD; i++) {
+		if (curr->fd_table[i] == NULL) {
+			fd = i;
+			break;
+		}
+	}
+
+	if (fd == -1) {			//# fd_table이 꽉찼으면 파일 닫고 -1 리턴
+		file_close(f);
+		return -1;
+	}
+	curr->fd_table[fd] = f;		//# fd번 인덱스에 파일 포인터 저장
+	return fd;
 }
 
-int
+static int
 filesize (int fd) {
 }
 
