@@ -60,12 +60,24 @@ exit (int status) {
 	thread_exit ();
 }
 
+void
+range_chk (void *args, void *end_args){
+	if ((args == NULL) || !is_user_vaddr(args) || !pml4_get_page(thread_current()->pml4, args)){
+		exit(-1);
+	}
+	if (end_args != NULL){
+		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= &end_args - 1; i += PGSIZE){
+			if (!is_user_vaddr(i) || !pml4_get_page(thread_current()->pml4, (const void *) i)){
+				exit(-1);
+			}
+		}
+	}
+}
+
 pid_t
 fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
-	if ((thread_name == NULL) || !is_user_vaddr(thread_name) || !pml4_get_page(thread_current()->pml4, thread_name)){
-		exit(-1);
-	}
+	range_chk(thread_name, NULL);
 
 	// 2) process_fork 호출 및 반환
 	return process_fork(thread_name, f);
@@ -74,9 +86,7 @@ fork (const char *thread_name, struct intr_frame *f){
 
 int
 exec (const char *file) {
-	if (file == NULL || !is_user_vaddr(file) || !pml4_get_page(thread_current()->pml4, file)){
-		exit(-1);
-	}
+	range_chk(file, NULL);
 
 	/* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
 	char *file_name = palloc_get_page(0);
@@ -117,11 +127,16 @@ read (int fd, void *buffer, unsigned size) {
 
 int
 write (int fd, const void *buffer, unsigned size) {
+	range_chk(buffer, buffer + size);
+
 	if (fd == 1) {
 		putbuf (buffer, size);
 		return size;
 	}
-
+	
+	// else {
+	// 	return 
+	// }
 
 
 
