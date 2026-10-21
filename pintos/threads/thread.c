@@ -192,6 +192,9 @@ thread_create (const char *name, int priority,
 
 	/* Initialize thread. */
 	init_thread (t, name, priority);
+	t->fd_table = palloc_get_page(0);
+	memset(t->fd_table, 0, PGSIZE);
+
 	tid = t->tid = allocate_tid ();
 
 	/* Call the kernel_thread if it scheduled.
