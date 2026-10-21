@@ -12,6 +12,8 @@
 
 typedef int pid_t;
 
+#define MAX_FD 512
+
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -108,6 +110,8 @@ struct thread {
 	int exit_status;	// 종료 코드
 	struct list child_list;
 	struct child_status *self_status; 
+
+	struct file **fd_table;
 
 
 #ifdef USERPROG
